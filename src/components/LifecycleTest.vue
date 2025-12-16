@@ -7,7 +7,7 @@ const status = ref('Initializing...')
 onMounted(() => {
   console.log('✅ Component MOUNTED')
   status.value = 'Mounted! Check console.'
-  
+
   // Example: Start a timer
   const timer = setInterval(() => {
     console.log('⏱️ Timer tick')
@@ -23,7 +23,7 @@ onMounted(() => {
 const updateCount = ref(0)
 onUpdated(() => {
   console.log('🔄 Component UPDATED')
-  updateCount.value++ // Be careful, updating state in onUpdated can cause infinite loops if not careful!
+  // REMOVED: updateCount.value++ (This caused the infinite loop!)
 })
 </script>
 
@@ -31,16 +31,16 @@ onUpdated(() => {
   <div class="card lifecycle">
     <h2>4. Lifecycle Hooks</h2>
     <p>Status: {{ status }}</p>
-    <p>Updates: {{ updateCount }} (See console logs)</p>
+    <p class="hint">Check console for "Component UPDATED" logs when you click below.</p>
     <button @click="status = 'Updated at ' + new Date().toLocaleTimeString()">Trigger Update</button>
   </div>
 </template>
 
 <style scoped>
 /* Inherits .card */
-.lifecycle { 
+.lifecycle {
   background: white;
-  border: 1px solid var(--color-primary); 
+  border: 1px solid var(--color-primary);
 }
 
 .lifecycle h2 {
