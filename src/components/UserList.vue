@@ -1,30 +1,77 @@
 <script setup>
-import { onMounted, ref, computed } from 'vue' // Added ref and computed
+import { onMounted, ref, computed, reactive } from 'vue'
 import { useUserStore } from '../stores/userStore'
 import { storeToRefs } from 'pinia'
+import Modal from './Modal.vue'
 
 // Access the store
 const store = useUserStore()
 
 // Destructure state/getters with storeToRefs to keep reactivity
-// We still use sortedUsers as the source for our local filter
 const { sortedUsers, loading, error, userCount } = storeToRefs(store)
 
 // Actions can be destructured directly
 const { fetchUsers, removeUser } = store
 
-// --- Search Logic ---
+// --- Search & Filter Logic ---
 const searchQuery = ref('')
+const showFilterModal = ref(false)
+
+const advancedFilters = reactive({
+  name: '',
+  email: '',
+  company: ''
+})
+
+const hasActiveFilters = computed(() => {
+  return !!(advancedFilters.name || advancedFilters.email || advancedFilters.company)
+})
+
+const resetFilters = () => {
+  advancedFilters.name = ''
+  advancedFilters.email = ''
+  advancedFilters.company = ''
+  searchQuery.value = ''
+}
 
 const filteredUsers = computed(() => {
-  if (!searchQuery.value) return sortedUsers.value
+  let users = sortedUsers.value || []
 
-  const query = searchQuery.value.toLowerCase()
-  return sortedUsers.value.filter(user =>
-    user.name.toLowerCase().includes(query) ||
-    user.email.toLowerCase().includes(query) ||
-    (user.company && user.company.toLowerCase().includes(query))
-  )
+  // 1. Advanced Filters (Priority)
+  if (hasActiveFilters.value) {
+    users = users.filter(user => {
+      if (!user) return false
+      const userName = (user.name || '').toLowerCase()
+      const userEmail = (user.email || '').toLowerCase()
+      const userCompany = (user.company || '').toLowerCase()
+
+      const filterName = (advancedFilters.name || '').toLowerCase()
+      const filterEmail = (advancedFilters.email || '').toLowerCase()
+      const filterCompany = (advancedFilters.company || '').toLowerCase()
+
+      const matchName = !filterName || userName.includes(filterName)
+      const matchEmail = !filterEmail || userEmail.includes(filterEmail)
+      const matchCompany = !filterCompany || userCompany.includes(filterCompany)
+
+      return matchName && matchEmail && matchCompany
+    })
+  }
+  // 2. Global Search
+  else if (searchQuery.value) {
+    const query = searchQuery.value.toLowerCase()
+    users = users.filter(user => {
+      if (!user) return false
+      const userName = (user.name || '').toLowerCase()
+      const userEmail = (user.email || '').toLowerCase()
+      const userCompany = (user.company || '').toLowerCase()
+
+      return userName.includes(query) ||
+        userEmail.includes(query) ||
+        userCompany.includes(query)
+    })
+  }
+
+  return users
 })
 
 onMounted(() => {
@@ -37,15 +84,22 @@ onMounted(() => {
 <template>
   <div class="user-list">
     <div class="header">
-      <h2>User List ({{ userCount }})</h2>
+      <div class="title-group">
+        <h2>User List ({{ userCount }})</h2>
+        <span v-if="hasActiveFilters" class="filter-badge">Active Filters</span>
+      </div>
       <button @click="fetchUsers" :disabled="loading">
         {{ loading ? 'Loading...' : 'Refresh Data' }}
       </button>
     </div>
 
-    <!-- Search Input -->
+    <!-- Search Bar & Filter Button -->
     <div class="search-bar">
-      <input v-model="searchQuery" placeholder="Search users..." class="search-input" />
+      <input v-model="searchQuery" placeholder="Search users..." class="search-input" :disabled="hasActiveFilters"
+        :title="hasActiveFilters ? 'Clear advanced filters to use quick search' : ''" />
+      <button class="filter-btn" @click="showFilterModal = true">
+        Advanced Filter
+      </button>
     </div>
 
     <div v-if="error" class="error">{{ error }}</div>
@@ -66,8 +120,31 @@ onMounted(() => {
     </ul>
 
     <div v-if="!loading && filteredUsers.length === 0 && userCount > 0" class="no-results">
-      No users match your search.
+      No users match your criteria.
     </div>
+
+    <!-- Advanced Filter Modal -->
+    <Modal :isOpen="showFilterModal" title="Advanced Filters" @close="showFilterModal = false">
+      <div class="filter-form">
+        <div class="form-group">
+          <label>Name matches:</label>
+          <input v-model="advancedFilters.name" placeholder="e.g. Leanne" />
+        </div>
+        <div class="form-group">
+          <label>Email matches:</label>
+          <input v-model="advancedFilters.email" placeholder="e.g. @april.biz" />
+        </div>
+        <div class="form-group">
+          <label>Company matches:</label>
+          <input v-model="advancedFilters.company" placeholder="e.g. Romaguera" />
+        </div>
+      </div>
+
+      <template #footer>
+        <button class="secondary" @click="resetFilters">Clear Filters</button>
+        <button @click="showFilterModal = false">Done</button>
+      </template>
+    </Modal>
   </div>
 </template>
 
@@ -173,16 +250,16 @@ li:hover {
   padding: 1rem 1.5rem;
   border-bottom: 1px solid var(--color-border);
   background: #fff;
+  display: flex;
+  gap: 0.5rem;
 }
 
 .search-input {
-  width: 100%;
+  flex: 1;
   padding: 0.8rem;
   border: 1px solid var(--color-border);
   border-radius: 6px;
   font-size: 0.95rem;
-  box-sizing: border-box;
-  /* Important for full width */
 }
 
 .search-input:focus {
@@ -190,10 +267,68 @@ li:hover {
   border-color: transparent;
 }
 
+.search-input:disabled {
+  background: #f5f5f5;
+  cursor: not-allowed;
+}
+
+.filter-btn {
+  background: var(--color-secondary);
+  color: white;
+  white-space: nowrap;
+}
+
+.filter-btn:hover {
+  background: #2c3e50;
+}
+
+.title-group {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.filter-badge {
+  background: var(--color-accent);
+  color: white;
+  font-size: 0.7rem;
+  padding: 2px 6px;
+  border-radius: 4px;
+}
+
 .no-results {
   padding: 2rem;
   text-align: center;
   color: #64748b;
   font-style: italic;
+}
+
+/* Modal Form Styles */
+.filter-form {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.filter-form label {
+  font-weight: 500;
+  color: var(--color-secondary);
+  margin-bottom: 0.2rem;
+  display: block;
+}
+
+.filter-form input {
+  width: 100%;
+  box-sizing: border-box;
+}
+
+button.secondary {
+  background: transparent;
+  color: #666;
+  border: 1px solid #ddd;
+}
+
+button.secondary:hover {
+  background: #f5f5f5;
 }
 </style>
