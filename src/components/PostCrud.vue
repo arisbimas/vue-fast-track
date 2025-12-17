@@ -8,6 +8,7 @@ const selectedPostId = ref(null)
 const selectedPost = ref(null)
 const isEditing = ref(false)
 const notification = ref('')
+const postLimit = ref(5) // New state for fetch limit
 
 // Form State
 const formData = ref({ title: '', body: '' })
@@ -19,7 +20,7 @@ const BASE_URL = 'https://jsonplaceholder.typicode.com/posts'
 const fetchPosts = async () => {
     loading.value = true
     try {
-        const res = await fetch(`${BASE_URL}?_limit=5`)
+        const res = await fetch(`${BASE_URL}?_limit=${postLimit.value}`)
         posts.value = await res.json()
     } catch (e) {
         console.error(e)
@@ -125,6 +126,12 @@ watch(selectedPostId, (newId, oldId) => {
     fetchPostDetails(newId)
 })
 
+// C. Watch Limit Change
+watch(postLimit, () => {
+    console.log('Limit changed, refetching...')
+    fetchPosts()
+})
+
 // --- UTILS ---
 const selectPost = (id) => {
     selectedPostId.value = id
@@ -159,7 +166,15 @@ const showNotify = (msg) => {
 
         <div class="sidebar">
             <div class="header-row">
-                <h3>Posts</h3>
+                <div class="title-group">
+                    <h3>Posts</h3>
+                    <select v-model="postLimit" class="limit-select">
+                        <option :value="5">5 items</option>
+                        <option :value="10">10 items</option>
+                        <option :value="20">20 items</option>
+                        <option :value="50">50 items</option>
+                    </select>
+                </div>
                 <button class="sm" @click="resetForm">+ New</button>
             </div>
 
@@ -376,5 +391,19 @@ const showNotify = (msg) => {
         transform: translateY(0);
         opacity: 1;
     }
+}
+
+.title-group {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.limit-select {
+    padding: 2px;
+    border-radius: 4px;
+    border: 1px solid #ccc;
+    font-size: 0.8rem;
+    color: #444;
 }
 </style>
